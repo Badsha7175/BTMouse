@@ -1,5 +1,38 @@
 <?xml version="1.0" encoding="utf-8"?>
-<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
-    <background android:drawable="@drawable/ic_launcher_background" />
-    <foreground android:drawable="@drawable/ic_launcher_foreground" />
-</adaptive-icon>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- ডার্ক ব্যাকগ্রাউন্ড -->
+    <path
+        android:fillColor="#0F172A"
+        android:pathData="M0,0h108v108h-108z" />
+
+    <!-- ভেতরের গোল রিং -->
+    <path
+        android:fillColor="#1E293B"
+        android:pathData="M54,54m-44,0a44,44 0,1 1,88 0a44,44 0,1 1,-88 0" />
+
+    <!-- মাউসের বডি -->
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#38BDF8"
+        android:strokeWidth="4.5"
+        android:pathData="M54,24 C40,24 34,33 34,46 L34,64 C34,77 42,84 54,84 C66,84 74,77 74,64 L74,46 C74,33 68,24 54,24 Z" />
+
+    <!-- স্ক্রল হুইল -->
+    <path
+        android:fillColor="#3B82F6"
+        android:pathData="M54,33 C56.2,33 58,34.8 58,37 L58,43 C58,45.2 56.2,47 54,47 C51.8,47 50,45.2 50,43 L50,37 C50,34.8 51.8,33 54,33 Z" />
+
+    <!-- ব্লুটুথ সিম্বল -->
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#F8FAFC"
+        android:strokeWidth="3"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:pathData="M48,59 L60,70 L54,75 L54,54 L60,59 L48,70" />
+</vector>
