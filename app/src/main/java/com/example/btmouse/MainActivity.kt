@@ -263,7 +263,7 @@ class MainActivity : Activity() {
         }
         val list = a.bondedDevices?.toList() ?: emptyList()
         if (list.isEmpty()) {
-            toast("No paired devices. Tap Discoverable & pair from laptop first.")
+            toast("No paired devices. Tap Scan & pair from laptop first.")
             return
         }
         val names = list.map { "${it.name ?: "Unknown"}\n${it.address}" }.toTypedArray()
@@ -499,7 +499,7 @@ class MainActivity : Activity() {
         // ৩. অ্যাকশন বাটন (Discoverable & Connect)
         val top = LinearLayout(this)
         top.orientation = LinearLayout.HORIZONTAL
-        val discBtn = styledButton("Discoverable", CARD_BG, ACCENT_CYAN)
+        val discBtn = styledButton("Scan", CARD_BG, ACCENT_CYAN)
         discBtn.setOnClickListener { makeDiscoverable() }
         val connBtn = styledButton("Connect", ACCENT_BLUE, TEXT_PRIMARY)
         connBtn.setOnClickListener { pickDevice() }
@@ -520,7 +520,7 @@ class MainActivity : Activity() {
         padContainer.setOnTouchListener { _, ev -> onPad(ev) }
 
         val padHint = TextView(this)
-        padHint.text = "TOUCHPAD\n\n1 Finger: Move & Tap (Left Click)\n2 Fingers: Scroll & Tap (Right Click)"
+        padHint.text = "TOUCHPAD\n\n1 Finger: Move & Tap (Left Click)\n2 Fingers: Scroll & Tap (Right Click)\n\nDeveloped by ©Badsha"
         padHint.setTextColor(Color.parseColor(TEXT_MUTED))
         padHint.alpha = 0.45f
         padHint.textSize = 13f
