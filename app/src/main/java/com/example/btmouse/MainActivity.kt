@@ -108,10 +108,18 @@ class MainActivity : Activity() {
         super.onCreate(savedInstanceState)
         buildUi()
 
-        if (Build.VERSION.SDK_INT >= 31 &&
-            checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED
-        ) {
-            requestPermissions(arrayOf(Manifest.permission.BLUETOOTH_CONNECT), 1)
+        if (Build.VERSION.SDK_INT >= 31) {
+            val needed = arrayOf(
+                Manifest.permission.BLUETOOTH_CONNECT,
+                Manifest.permission.BLUETOOTH_ADVERTISE
+            ).filter {
+                checkSelfPermission(it) != PackageManager.PERMISSION_GRANTED
+            }
+            if (needed.isNotEmpty()) {
+                requestPermissions(needed.toTypedArray(), 1)
+            } else {
+                initBluetooth()
+            }
         } else {
             initBluetooth()
         }
@@ -121,10 +129,10 @@ class MainActivity : Activity() {
         requestCode: Int, permissions: Array<out String>, grantResults: IntArray
     ) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-        if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+        if (grantResults.isNotEmpty() && grantResults.all { it == PackageManager.PERMISSION_GRANTED }) {
             initBluetooth()
         } else {
-            setStatus("Bluetooth permission is required")
+            setStatus("Bluetooth permissions are required")
         }
     }
 
@@ -166,6 +174,12 @@ class MainActivity : Activity() {
     }
 
     private fun makeDiscoverable() {
+        if (Build.VERSION.SDK_INT >= 31 &&
+            checkSelfPermission(Manifest.permission.BLUETOOTH_ADVERTISE) != PackageManager.PERMISSION_GRANTED
+        ) {
+            toast("Advertise permission not granted")
+            return
+        }
         val i = Intent(BluetoothAdapter.ACTION_REQUEST_DISCOVERABLE)
         i.putExtra(BluetoothAdapter.EXTRA_DISCOVERABLE_DURATION, 120)
         startActivity(i)
