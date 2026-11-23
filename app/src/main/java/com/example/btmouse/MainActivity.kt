@@ -20,8 +20,10 @@ import android.view.MotionEvent
 import android.view.View
 import android.widget.Button
 import android.widget.LinearLayout
+import android.widget.SeekBar
 import android.widget.TextView
 import android.widget.Toast
+import java.util.Locale
 import java.util.concurrent.Executors
 import kotlin.math.abs
 
@@ -80,7 +82,7 @@ class MainActivity : Activity() {
     private var downTime = 0L
     private var moved = 0f
     private var maxPointers = 0
-    private val sensitivity = 1.8f
+    private var sensitivity = 1.0f
 
     private val hidCallback = object : BluetoothHidDevice.Callback() {
         override fun onAppStatusChanged(pluggedDevice: BluetoothDevice?, registered: Boolean) {
@@ -365,6 +367,33 @@ class MainActivity : Activity() {
         root.orientation = LinearLayout.VERTICAL
         root.setPadding(dp(12), dp(12), dp(12), dp(12))
 
+        // ১. একদম ওপরে কার্সার স্পিড স্লাইডার (Range)
+        val speedRow = LinearLayout(this)
+        speedRow.orientation = LinearLayout.HORIZONTAL
+        speedRow.gravity = Gravity.CENTER_VERTICAL
+        speedRow.setPadding(0, 0, 0, dp(6))
+
+        val speedLabel = TextView(this)
+        speedLabel.text = "Speed: 1.0x"
+        speedLabel.textSize = 14f
+
+        val speedBar = SeekBar(this)
+        speedBar.max = 27
+        speedBar.progress = 7
+        speedBar.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+            override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
+                sensitivity = 0.3f + (progress * 0.1f)
+                speedLabel.text = String.format(Locale.US, "Speed: %.1fx", sensitivity)
+            }
+            override fun onStartTrackingTouch(seekBar: SeekBar?) {}
+            override fun onStopTrackingTouch(seekBar: SeekBar?) {}
+        })
+
+        speedRow.addView(speedLabel, LinearLayout.LayoutParams(dp(90), LinearLayout.LayoutParams.WRAP_CONTENT))
+        speedRow.addView(speedBar, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
+        root.addView(speedRow)
+
+        // ২. এরপর স্ট্যাটাস টেক্সট ও বাটন
         statusView = TextView(this)
         statusView.text = "Starting..."
         statusView.textSize = 16f
@@ -384,15 +413,17 @@ class MainActivity : Activity() {
         top.addView(connBtn, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
         root.addView(top)
 
+        // ৩. এরপর টাচপ্যাড
         val pad = View(this)
         pad.setBackgroundColor(Color.parseColor("#DDDDDD"))
         pad.setOnTouchListener { _, ev -> onPad(ev) }
         val padLp = LinearLayout.LayoutParams(
             LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f)
-        padLp.topMargin = dp(8)
+        padLp.topMargin = dp(6)
         padLp.bottomMargin = dp(8)
         root.addView(pad, padLp)
 
+        // ৪. একদম নিচে LEFT ও RIGHT বাটন
         val bottom = LinearLayout(this)
         bottom.orientation = LinearLayout.HORIZONTAL
         val left = holdButton("LEFT", 1)
