@@ -16,13 +16,11 @@ import android.content.res.ColorStateList
 import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
-import android.graphics.drawable.RippleDrawable
 import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
 import android.view.Gravity
 import android.view.MotionEvent
-import android.view.WindowManager
 import android.widget.Button
 import android.widget.FrameLayout
 import android.widget.LinearLayout
@@ -37,7 +35,6 @@ import kotlin.math.abs
 class MainActivity : Activity() {
 
     companion object {
-        // HID report descriptor: 3 buttons + X + Y + wheel (4 byte report, no report id)
         private val DESCRIPTOR: ByteArray = intArrayOf(
             0x05, 0x01,       // Usage Page (Generic Desktop)
             0x09, 0x02,       // Usage (Mouse)
@@ -68,7 +65,6 @@ class MainActivity : Activity() {
             0xC0              // End Collection
         ).map { it.toByte() }.toByteArray()
 
-        // Modern Dark Theme Colors
         private const val BG_DARK = "#0F172A"
         private const val CARD_BG = "#1E293B"
         private const val PAD_BG = "#162032"
@@ -92,7 +88,6 @@ class MainActivity : Activity() {
 
     private lateinit var statusView: TextView
 
-    // touch state
     private var lastX = 0f
     private var lastY = 0f
     private var accX = 0f
@@ -138,13 +133,11 @@ class MainActivity : Activity() {
         }
 
         override fun onSetProtocol(device: BluetoothDevice?, protocol: Byte) {
-            // Host protocol request acknowledged
         }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        window.addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS)
         window.statusBarColor = Color.parseColor(BG_DARK)
         window.navigationBarColor = Color.parseColor(BG_DARK)
 
@@ -274,7 +267,7 @@ class MainActivity : Activity() {
             return
         }
         val names = list.map { "${it.name ?: "Unknown"}\n${it.address}" }.toTypedArray()
-        AlertDialog.Builder(this, android.R.style.Theme_Material_Dialog_Alert)
+        AlertDialog.Builder(this)
             .setTitle("Select your laptop")
             .setItems(names) { _, i -> connectTo(list[i]) }
             .show()
@@ -410,16 +403,13 @@ class MainActivity : Activity() {
     }
 
     private fun styledButton(label: String, bgHex: String, textHex: String = TEXT_PRIMARY): Button {
-        val base = roundedBox(bgHex, BORDER_COLOR, 14, 1)
-        val ripple = RippleDrawable(ColorStateList.valueOf(Color.parseColor("#40FFFFFF")), base, null)
         val btn = Button(this)
         btn.text = label
         btn.setTextColor(Color.parseColor(textHex))
         btn.textSize = 14f
         btn.typeface = Typeface.DEFAULT_BOLD
         btn.isAllCaps = false
-        btn.background = ripple
-        btn.stateListAnimator = null
+        btn.background = roundedBox(bgHex, BORDER_COLOR, 14, 1)
         return btn
     }
 
@@ -433,7 +423,6 @@ class MainActivity : Activity() {
         b.typeface = Typeface.DEFAULT_BOLD
         b.isAllCaps = false
         b.background = normalBg
-        b.stateListAnimator = null
 
         b.setOnTouchListener { _, e ->
             when (e.actionMasked) {
@@ -461,7 +450,7 @@ class MainActivity : Activity() {
         root.setBackgroundColor(Color.parseColor(BG_DARK))
         root.setPadding(dp(14), dp(14), dp(14), dp(14))
 
-        // ১. একদম ওপরে কার্সার স্পিড স্লাইডার কার্ড (Range)
+        // ১. একদম ওপরে কার্সার স্পিড স্লাইডার কার্ড
         val speedCard = LinearLayout(this)
         speedCard.orientation = LinearLayout.HORIZONTAL
         speedCard.gravity = Gravity.CENTER_VERTICAL
@@ -469,7 +458,7 @@ class MainActivity : Activity() {
         speedCard.setPadding(dp(14), dp(10), dp(14), dp(10))
 
         val speedLabel = TextView(this)
-        speedLabel.text = "⚡ Speed: 1.0x"
+        speedLabel.text = "Speed: 1.0x"
         speedLabel.setTextColor(Color.parseColor(ACCENT_CYAN))
         speedLabel.textSize = 14f
         speedLabel.typeface = Typeface.DEFAULT_BOLD
@@ -479,17 +468,16 @@ class MainActivity : Activity() {
         speedBar.progress = 7
         speedBar.progressTintList = ColorStateList.valueOf(Color.parseColor(ACCENT_CYAN))
         speedBar.thumbTintList = ColorStateList.valueOf(Color.parseColor(ACCENT_BLUE))
-        speedBar.progressBackgroundTintList = ColorStateList.valueOf(Color.parseColor(BORDER_COLOR))
         speedBar.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
             override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
                 sensitivity = 0.3f + (progress * 0.1f)
-                speedLabel.text = String.format(Locale.US, "⚡ Speed: %.1fx", sensitivity)
+                speedLabel.text = String.format(Locale.US, "Speed: %.1fx", sensitivity)
             }
             override fun onStartTrackingTouch(seekBar: SeekBar?) {}
             override fun onStopTrackingTouch(seekBar: SeekBar?) {}
         })
 
-        speedCard.addView(speedLabel, LinearLayout.LayoutParams(dp(115), LinearLayout.LayoutParams.WRAP_CONTENT))
+        speedCard.addView(speedLabel, LinearLayout.LayoutParams(dp(105), LinearLayout.LayoutParams.WRAP_CONTENT))
         speedCard.addView(speedBar, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
         val speedLp = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT)
         speedLp.bottomMargin = dp(10)
@@ -511,9 +499,9 @@ class MainActivity : Activity() {
         // ৩. অ্যাকশন বাটন (Discoverable & Connect)
         val top = LinearLayout(this)
         top.orientation = LinearLayout.HORIZONTAL
-        val discBtn = styledButton("📡 Discoverable", CARD_BG, ACCENT_CYAN)
+        val discBtn = styledButton("Discoverable", CARD_BG, ACCENT_CYAN)
         discBtn.setOnClickListener { makeDiscoverable() }
-        val connBtn = styledButton("🔗 Connect", ACCENT_BLUE, TEXT_PRIMARY)
+        val connBtn = styledButton("Connect", ACCENT_BLUE, TEXT_PRIMARY)
         connBtn.setOnClickListener { pickDevice() }
 
         val discLp = LinearLayout.LayoutParams(0, dp(48), 1f)
