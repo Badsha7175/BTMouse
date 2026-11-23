@@ -12,13 +12,18 @@ import android.bluetooth.BluetoothManager
 import android.bluetooth.BluetoothProfile
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.content.res.ColorStateList
 import android.graphics.Color
+import android.graphics.Typeface
+import android.graphics.drawable.GradientDrawable
+import android.graphics.drawable.RippleDrawable
 import android.os.Build
 import android.os.Bundle
 import android.view.Gravity
 import android.view.MotionEvent
-import android.view.View
+import android.view.WindowManager
 import android.widget.Button
+import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.SeekBar
 import android.widget.TextView
@@ -61,6 +66,19 @@ class MainActivity : Activity() {
             0xC0,             //   End Collection
             0xC0              // End Collection
         ).map { it.toByte() }.toByteArray()
+
+        // Modern Dark Theme Colors
+        private const val BG_DARK = "#0F172A"
+        private const val CARD_BG = "#1E293B"
+        private const val PAD_BG = "#162032"
+        private const val BORDER_COLOR = "#334155"
+        private const val ACCENT_BLUE = "#3B82F6"
+        private const val ACCENT_CYAN = "#06B6D4"
+        private const val ACCENT_GREEN = "#10B981"
+        private const val ACCENT_RED = "#EF4444"
+        private const val ACCENT_AMBER = "#F59E0B"
+        private const val TEXT_PRIMARY = "#F8FAFC"
+        private const val TEXT_MUTED = "#94A3B8"
     }
 
     private var adapter: BluetoothAdapter? = null
@@ -87,10 +105,11 @@ class MainActivity : Activity() {
     private val hidCallback = object : BluetoothHidDevice.Callback() {
         override fun onAppStatusChanged(pluggedDevice: BluetoothDevice?, registered: Boolean) {
             appRegistered = registered
-            setStatus(
-                if (registered) "Ready. Pair from laptop, then tap Connect."
-                else "HID app not registered"
-            )
+            if (registered) {
+                setStatus("● Ready — Pair from laptop, then tap Connect", ACCENT_CYAN)
+            } else {
+                setStatus("● HID app not registered", ACCENT_AMBER)
+            }
         }
 
         override fun onConnectionStateChanged(device: BluetoothDevice?, state: Int) {
@@ -98,18 +117,23 @@ class MainActivity : Activity() {
                 BluetoothProfile.STATE_CONNECTED -> {
                     host = device
                     errorShown = false
-                    setStatus("Connected: ${device?.name ?: device?.address}")
+                    setStatus("● Connected: ${device?.name ?: device?.address}", ACCENT_GREEN)
                 }
-                BluetoothProfile.STATE_CONNECTING -> setStatus("Connecting...")
+                BluetoothProfile.STATE_CONNECTING -> {
+                    setStatus("● Connecting...", ACCENT_AMBER)
+                }
                 BluetoothProfile.STATE_DISCONNECTED -> {
                     host = null
-                    setStatus("Disconnected")
+                    setStatus("● Disconnected", ACCENT_RED)
                 }
             }
         }
 
         override fun onGetReport(device: BluetoothDevice?, type: Byte, id: Byte, bufferSize: Int) {
-            hid?.replyReport(device, type, id, byteArrayOf(0, 0, 0, 0))
+            try {
+                hid?.replyReport(device, type, id, byteArrayOf(0, 0, 0, 0))
+            } catch (_: Exception) {
+            }
         }
 
         override fun onSetProtocol(device: BluetoothDevice?, protocol: Byte) {
@@ -119,32 +143,36 @@ class MainActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // স্ট্যাটাস বার ও নেভিগেশন বার ডার্ক থিমের সাথে ম্যাচ করা
+        window.addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS)
+        window.statusBarColor = Color.parseColor(BG_DARK)
+        window.navigationBarColor = Color.parseColor(BG_DARK)
+
         buildUi()
-        checkPermissionsAndInit()
+
+        if (Build.VERSION.SDK_INT >= 31 &&
+            checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED
+        ) {
+            requestPermissions(
+                arrayOf(
+                    Manifest.permission.BLUETOOTH_CONNECT,
+                    Manifest.permission.BLUETOOTH_ADVERTISE
+                ),
+                1
+            )
+        } else {
+            initBluetooth()
+        }
     }
 
     override fun onResume() {
         super.onResume()
         if (hid == null || !appRegistered) {
-            checkPermissionsAndInit()
-        }
-    }
-
-    private fun checkPermissionsAndInit() {
-        if (Build.VERSION.SDK_INT >= 31) {
-            val needed = arrayOf(
-                Manifest.permission.BLUETOOTH_CONNECT,
-                Manifest.permission.BLUETOOTH_ADVERTISE
-            ).filter {
-                checkSelfPermission(it) != PackageManager.PERMISSION_GRANTED
-            }
-            if (needed.isNotEmpty()) {
-                requestPermissions(needed.toTypedArray(), 1)
-            } else {
+            if (Build.VERSION.SDK_INT < 31 ||
+                checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED
+            ) {
                 initBluetooth()
             }
-        } else {
-            initBluetooth()
         }
     }
 
@@ -152,304 +180,87 @@ class MainActivity : Activity() {
         requestCode: Int, permissions: Array<out String>, grantResults: IntArray
     ) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-        if (grantResults.isNotEmpty() && grantResults.all { it == PackageManager.PERMISSION_GRANTED }) {
+        if (Build.VERSION.SDK_INT < 31 ||
+            checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED
+        ) {
             initBluetooth()
         } else {
-            setStatus("Bluetooth permissions are required")
+            setStatus("● Nearby devices permission required!", ACCENT_RED)
         }
     }
 
     private fun initBluetooth() {
-        val mgr = getSystemService(BluetoothManager::class.java)
-        adapter = mgr?.adapter
-        val a = adapter
-        if (a == null || !a.isEnabled) {
-            setStatus("Turn Bluetooth on, then return to app")
-            return
-        }
-        if (hid != null) {
-            if (!appRegistered) registerHid()
-            return
-        }
-        a.getProfileProxy(this, object : BluetoothProfile.ServiceListener {
-            override fun onServiceConnected(profile: Int, proxy: BluetoothProfile) {
-                if (profile == BluetoothProfile.HID_DEVICE) {
-                    hid = proxy as BluetoothHidDevice
-                    registerHid()
-                }
+        try {
+            val mgr = getSystemService(BluetoothManager::class.java)
+            adapter = mgr?.adapter
+            val a = adapter
+            if (a == null || !a.isEnabled) {
+                setStatus("● Turn Bluetooth ON, then return to app", ACCENT_AMBER)
+                return
             }
+            if (hid != null) {
+                if (!appRegistered) registerHid()
+                return
+            }
+            a.getProfileProxy(this, object : BluetoothProfile.ServiceListener {
+                override fun onServiceConnected(profile: Int, proxy: BluetoothProfile) {
+                    if (profile == BluetoothProfile.HID_DEVICE) {
+                        hid = proxy as BluetoothHidDevice
+                        registerHid()
+                    }
+                }
 
-            override fun onServiceDisconnected(profile: Int) {
-                if (profile == BluetoothProfile.HID_DEVICE) {
-                    hid = null
-                    appRegistered = false
-                    setStatus("HID service disconnected")
+                override fun onServiceDisconnected(profile: Int) {
+                    if (profile == BluetoothProfile.HID_DEVICE) {
+                        hid = null
+                        appRegistered = false
+                        setStatus("● HID service disconnected", ACCENT_RED)
+                    }
                 }
-            }
-        }, BluetoothProfile.HID_DEVICE)
+            }, BluetoothProfile.HID_DEVICE)
+        } catch (e: Exception) {
+            setStatus("● Bluetooth error: ${e.message}", ACCENT_RED)
+        }
     }
 
     private fun registerHid() {
-        val sdp = BluetoothHidDeviceAppSdpSettings(
-            "BT Mouse",
-            "Phone as Bluetooth mouse",
-            "BTMouse",
-            BluetoothHidDevice.SUBCLASS1_MOUSE,
-            DESCRIPTOR
-        )
-        hid?.registerApp(sdp, null, null, executor, hidCallback)
+        try {
+            val sdp = BluetoothHidDeviceAppSdpSettings(
+                "BT Mouse",
+                "Phone as Bluetooth mouse",
+                "BTMouse",
+                BluetoothHidDevice.SUBCLASS1_MOUSE,
+                DESCRIPTOR
+            )
+            hid?.registerApp(sdp, null, null, executor, hidCallback)
+        } catch (e: Exception) {
+            setStatus("● HID register error: ${e.message}", ACCENT_RED)
+        }
     }
 
     private fun makeDiscoverable() {
-        if (Build.VERSION.SDK_INT >= 31 &&
-            checkSelfPermission(Manifest.permission.BLUETOOTH_ADVERTISE) != PackageManager.PERMISSION_GRANTED
-        ) {
-            toast("Advertise permission not granted")
-            return
+        try {
+            if (Build.VERSION.SDK_INT >= 31 &&
+                checkSelfPermission(Manifest.permission.BLUETOOTH_ADVERTISE) != PackageManager.PERMISSION_GRANTED
+            ) {
+                requestPermissions(arrayOf(Manifest.permission.BLUETOOTH_ADVERTISE), 2)
+                return
+            }
+            val i = Intent(BluetoothAdapter.ACTION_REQUEST_DISCOVERABLE)
+            i.putExtra(BluetoothAdapter.EXTRA_DISCOVERABLE_DURATION, 120)
+            startActivity(i)
+        } catch (_: Exception) {
+            toast("Open phone Bluetooth settings to pair")
         }
-        val i = Intent(BluetoothAdapter.ACTION_REQUEST_DISCOVERABLE)
-        i.putExtra(BluetoothAdapter.EXTRA_DISCOVERABLE_DURATION, 120)
-        startActivity(i)
     }
 
     private fun pickDevice() {
-        val a = adapter ?: return
-        val list = a.bondedDevices.toList()
-        if (list.isEmpty()) {
-            toast("No paired devices. Pair with your laptop first.")
+        if (Build.VERSION.SDK_INT >= 31 &&
+            checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED
+        ) {
+            requestPermissions(arrayOf(Manifest.permission.BLUETOOTH_CONNECT), 1)
             return
         }
-        val names = list.map { "${it.name ?: "Unknown"}\n${it.address}" }.toTypedArray()
-        AlertDialog.Builder(this)
-            .setTitle("Select your laptop")
-            .setItems(names) { _, i -> connectTo(list[i]) }
-            .show()
-    }
-
-    private fun connectTo(d: BluetoothDevice) {
-        val h = hid
-        if (h == null) {
-            toast("Error: Phone does not support Bluetooth HID or BT is off")
+        val a = adapter ?: run {
             initBluetooth()
-            return
-        }
-        if (!appRegistered) {
-            toast("HID app registering... try again in 2 seconds")
-            registerHid()
-            return
-        }
-        host = d
-        h.connect(d)
-        setStatus("Connecting to ${d.name ?: d.address}...")
-    }
-
-    private fun send(btn: Int, dx: Int, dy: Int, wheel: Int) {
-        val h = hid ?: return
-        val d = host ?: run {
-            if (!errorShown) {
-                errorShown = true
-                setStatus("Not connected! Tap Connect first.")
-            }
-            return
-        }
-        val report = byteArrayOf(
-            btn.toByte(),
-            dx.coerceIn(-127, 127).toByte(),
-            dy.coerceIn(-127, 127).toByte(),
-            wheel.coerceIn(-127, 127).toByte()
-        )
-        val ok = h.sendReport(d, 0, report)
-        if (!ok && !errorShown) {
-            errorShown = true
-            setStatus("Send failed! Unpair from both devices & pair again.")
-        }
-    }
-
-    private fun avgX(e: MotionEvent): Float {
-        var s = 0f
-        for (i in 0 until e.pointerCount) s += e.getX(i)
-        return s / e.pointerCount
-    }
-
-    private fun avgY(e: MotionEvent): Float {
-        var s = 0f
-        for (i in 0 until e.pointerCount) s += e.getY(i)
-        return s / e.pointerCount
-    }
-
-    private fun onPad(ev: MotionEvent): Boolean {
-        when (ev.actionMasked) {
-            MotionEvent.ACTION_DOWN -> {
-                lastX = ev.x
-                lastY = ev.y
-                downTime = ev.eventTime
-                moved = 0f
-                maxPointers = 1
-                accX = 0f; accY = 0f; accWheel = 0f
-            }
-            MotionEvent.ACTION_POINTER_DOWN -> {
-                maxPointers = maxOf(maxPointers, ev.pointerCount)
-                lastX = avgX(ev)
-                lastY = avgY(ev)
-            }
-            MotionEvent.ACTION_POINTER_UP -> {
-                if (ev.pointerCount > 1) {
-                    val keep = if (ev.actionIndex == 0) 1 else 0
-                    lastX = ev.getX(keep)
-                    lastY = ev.getY(keep)
-                }
-            }
-            MotionEvent.ACTION_MOVE -> {
-                val cx = avgX(ev)
-                val cy = avgY(ev)
-                val dx = cx - lastX
-                val dy = cy - lastY
-                lastX = cx
-                lastY = cy
-                moved += abs(dx) + abs(dy)
-
-                if (ev.pointerCount >= 2) {
-                    // two finger scroll
-                    accWheel += dy / 12f
-                    val w = accWheel.toInt()
-                    if (w != 0) {
-                        accWheel -= w
-                        send(buttons, 0, 0, w)
-                    }
-                } else {
-                    accX += dx * sensitivity
-                    accY += dy * sensitivity
-                    val ix = accX.toInt()
-                    val iy = accY.toInt()
-                    if (ix != 0 || iy != 0) {
-                        accX -= ix
-                        accY -= iy
-                        send(buttons, ix, iy, 0)
-                    }
-                }
-            }
-            MotionEvent.ACTION_UP -> {
-                val quick = ev.eventTime - downTime < 250 && moved < 24f
-                if (quick) {
-                    // one finger tap = left click, two finger tap = right click
-                    val bit = if (maxPointers >= 2) 2 else 1
-                    send(buttons or bit, 0, 0, 0)
-                    send(buttons, 0, 0, 0)
-                }
-            }
-        }
-        return true
-    }
-
-    private fun holdButton(label: String, bit: Int): Button {
-        val b = Button(this)
-        b.text = label
-        b.setOnTouchListener { _, e ->
-            when (e.actionMasked) {
-                MotionEvent.ACTION_DOWN -> {
-                    buttons = buttons or bit
-                    send(buttons, 0, 0, 0)
-                }
-                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
-                    buttons = buttons and bit.inv()
-                    send(buttons, 0, 0, 0)
-                }
-            }
-            true
-        }
-        return b
-    }
-
-    private fun dp(v: Int): Int = (v * resources.displayMetrics.density).toInt()
-
-    private fun buildUi() {
-        val root = LinearLayout(this)
-        root.orientation = LinearLayout.VERTICAL
-        root.setPadding(dp(12), dp(12), dp(12), dp(12))
-
-        // ১. একদম ওপরে কার্সার স্পিড স্লাইডার (Range)
-        val speedRow = LinearLayout(this)
-        speedRow.orientation = LinearLayout.HORIZONTAL
-        speedRow.gravity = Gravity.CENTER_VERTICAL
-        speedRow.setPadding(0, 0, 0, dp(6))
-
-        val speedLabel = TextView(this)
-        speedLabel.text = "Speed: 1.0x"
-        speedLabel.textSize = 14f
-
-        val speedBar = SeekBar(this)
-        speedBar.max = 27
-        speedBar.progress = 7
-        speedBar.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
-            override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
-                sensitivity = 0.3f + (progress * 0.1f)
-                speedLabel.text = String.format(Locale.US, "Speed: %.1fx", sensitivity)
-            }
-            override fun onStartTrackingTouch(seekBar: SeekBar?) {}
-            override fun onStopTrackingTouch(seekBar: SeekBar?) {}
-        })
-
-        speedRow.addView(speedLabel, LinearLayout.LayoutParams(dp(90), LinearLayout.LayoutParams.WRAP_CONTENT))
-        speedRow.addView(speedBar, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
-        root.addView(speedRow)
-
-        // ২. এরপর স্ট্যাটাস টেক্সট ও বাটন
-        statusView = TextView(this)
-        statusView.text = "Starting..."
-        statusView.textSize = 16f
-        statusView.gravity = Gravity.CENTER
-        root.addView(statusView, LinearLayout.LayoutParams(
-            LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT))
-
-        val top = LinearLayout(this)
-        top.orientation = LinearLayout.HORIZONTAL
-        val discBtn = Button(this)
-        discBtn.text = "Make discoverable"
-        discBtn.setOnClickListener { makeDiscoverable() }
-        val connBtn = Button(this)
-        connBtn.text = "Connect"
-        connBtn.setOnClickListener { pickDevice() }
-        top.addView(discBtn, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
-        top.addView(connBtn, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
-        root.addView(top)
-
-        // ৩. এরপর টাচপ্যাড
-        val pad = View(this)
-        pad.setBackgroundColor(Color.parseColor("#DDDDDD"))
-        pad.setOnTouchListener { _, ev -> onPad(ev) }
-        val padLp = LinearLayout.LayoutParams(
-            LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f)
-        padLp.topMargin = dp(6)
-        padLp.bottomMargin = dp(8)
-        root.addView(pad, padLp)
-
-        // ৪. একদম নিচে LEFT ও RIGHT বাটন
-        val bottom = LinearLayout(this)
-        bottom.orientation = LinearLayout.HORIZONTAL
-        val left = holdButton("LEFT", 1)
-        val right = holdButton("RIGHT", 2)
-        bottom.addView(left, LinearLayout.LayoutParams(0, dp(64), 1f))
-        bottom.addView(right, LinearLayout.LayoutParams(0, dp(64), 1f))
-        root.addView(bottom)
-
-        setContentView(root)
-    }
-
-    private fun setStatus(s: String) {
-        runOnUiThread { statusView.text = s }
-    }
-
-    private fun toast(s: String) {
-        Toast.makeText(this, s, Toast.LENGTH_SHORT).show()
-    }
-
-    override fun onDestroy() {
-        super.onDestroy()
-        try {
-            hid?.unregisterApp()
-        } catch (_: Exception) {
-        }
-        hid?.let { adapter?.closeProfileProxy(BluetoothProfile.HID_DEVICE, it) }
-        executor.shutdown()
-    }
-}
+            toast("Bluetooth not
