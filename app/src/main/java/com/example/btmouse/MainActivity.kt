@@ -19,6 +19,7 @@ import android.graphics.drawable.GradientDrawable
 import android.graphics.drawable.RippleDrawable
 import android.os.Build
 import android.os.Bundle
+import android.provider.Settings
 import android.view.Gravity
 import android.view.MotionEvent
 import android.view.WindowManager
@@ -242,14 +243,16 @@ class MainActivity : Activity() {
             if (Build.VERSION.SDK_INT >= 31 &&
                 checkSelfPermission(Manifest.permission.BLUETOOTH_ADVERTISE) != PackageManager.PERMISSION_GRANTED
             ) {
-                requestPermissions(arrayOf(Manifest.permission.BLUETOOTH_ADVERTISE), 2)
+                startActivity(Intent(Settings.ACTION_BLUETOOTH_SETTINGS))
+                toast("Keep Bluetooth settings open & pair from your laptop")
                 return
             }
             val i = Intent(BluetoothAdapter.ACTION_REQUEST_DISCOVERABLE)
             i.putExtra(BluetoothAdapter.EXTRA_DISCOVERABLE_DURATION, 120)
             startActivity(i)
         } catch (_: Exception) {
-            toast("Open phone Bluetooth settings to pair")
+            startActivity(Intent(Settings.ACTION_BLUETOOTH_SETTINGS))
+            toast("Keep Bluetooth settings open & pair from your laptop")
         }
     }
 
@@ -267,7 +270,7 @@ class MainActivity : Activity() {
         }
         val list = a.bondedDevices?.toList() ?: emptyList()
         if (list.isEmpty()) {
-            toast("No paired devices. Pair with your laptop first.")
+            toast("No paired devices. Tap Discoverable & pair from laptop first.")
             return
         }
         val names = list.map { "${it.name ?: "Unknown"}\n${it.address}" }.toTypedArray()
@@ -367,7 +370,6 @@ class MainActivity : Activity() {
                 moved += abs(dx) + abs(dy)
 
                 if (ev.pointerCount >= 2) {
-                    // two finger scroll
                     accWheel += dy / 12f
                     val w = accWheel.toInt()
                     if (w != 0) {
@@ -389,7 +391,6 @@ class MainActivity : Activity() {
             MotionEvent.ACTION_UP -> {
                 val quick = ev.eventTime - downTime < 250 && moved < 24f
                 if (quick) {
-                    // one finger tap = left click, two finger tap = right click
                     val bit = if (maxPointers >= 2) 2 else 1
                     send(buttons or bit, 0, 0, 0)
                     send(buttons, 0, 0, 0)
